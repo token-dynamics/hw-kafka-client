@@ -5,20 +5,20 @@ module Kafka.Producer.Callbacks
 )
 where
 
-import           Control.Monad          (void)
-import           Control.Exception      (bracket)
-import           Control.Concurrent     (forkIO)
-import           Foreign.C.Error        (getErrno)
-import           Foreign.Ptr            (Ptr, nullPtr)
-import           Foreign.Storable       (Storable(peek))
-import           Foreign.StablePtr      (castPtrToStablePtr, deRefStablePtr, freeStablePtr)
-import           Kafka.Callbacks        as X
-import           Kafka.Consumer.Types   (Offset(..))
-import           Kafka.Internal.RdKafka (RdKafkaMessageT(..), RdKafkaRespErrT(..), rdKafkaConfSetDrMsgCb)
-import           Kafka.Internal.Setup   (KafkaConf(..), getRdKafkaConf)
-import           Kafka.Internal.Shared  (kafkaRespErr, readTopic, readKey, readPayload)
-import           Kafka.Producer.Types   (ProducerRecord(..), DeliveryReport(..), ProducePartition(..))
-import           Kafka.Types            (KafkaError(..), TopicName(..))
+import Control.Concurrent     (forkIO)
+import Control.Exception      (bracket)
+import Control.Monad          (void)
+import Foreign.C.Error        (getErrno)
+import Foreign.Ptr            (Ptr, nullPtr)
+import Foreign.StablePtr      (castPtrToStablePtr, deRefStablePtr, freeStablePtr)
+import Foreign.Storable       (Storable (peek))
+import Kafka.Callbacks        as X
+import Kafka.Consumer.Types   (Offset (..))
+import Kafka.Internal.RdKafka (RdKafkaMessageT (..), RdKafkaRespErrT (..), rdKafkaConfSetDrMsgCb)
+import Kafka.Internal.Setup   (Callback (..), getRdKafkaConf)
+import Kafka.Internal.Shared  (kafkaRespErr, readKey, readPayload, readTopic)
+import Kafka.Producer.Types   (DeliveryReport (..), ProducePartition (..), ProducerRecord (..))
+import Kafka.Types            (KafkaError (..), TopicName (..))
 
 -- | Sets the callback for delivery reports.
 --
@@ -27,8 +27,9 @@ import           Kafka.Types            (KafkaError(..), TopicName(..))
 --   callbacks. For callbacks to individual messsages see
 --   'Kafka.Producer.produceMessage\''./
 --
-deliveryCallback :: (DeliveryReport -> IO ()) -> KafkaConf -> IO ()
-deliveryCallback callback kc = rdKafkaConfSetDrMsgCb (getRdKafkaConf kc) realCb
+deliveryCallback :: (DeliveryReport -> IO ()) -> Callback
+deliveryCallback callback =
+  Callback $ \kc -> rdKafkaConfSetDrMsgCb (getRdKafkaConf kc) realCb
   where
     realCb :: t -> Ptr RdKafkaMessageT -> IO ()
     realCb _ mptr =

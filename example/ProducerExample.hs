@@ -1,5 +1,5 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 
 module ProducerExample
 where
@@ -7,12 +7,12 @@ where
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception       (bracket)
 import Control.Monad           (forM_)
-import Control.Monad.IO.Class  (MonadIO(..))
+import Control.Monad.IO.Class  (MonadIO (..))
 import Data.ByteString         (ByteString)
 import Data.ByteString.Char8   (pack)
+import Data.Text               (Text)
 import Kafka.Consumer          (Offset)
 import Kafka.Producer
-import Data.Text               (Text)
 
 -- Global producer properties
 producerProps :: ProducerProperties

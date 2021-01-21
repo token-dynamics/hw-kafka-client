@@ -21,16 +21,16 @@ module Kafka.Producer.ProducerProperties
 )
 where
 
-import           Data.Text                (Text)
-import qualified Data.Text                as Text
-import           Control.Monad            (MonadPlus(mplus))
-import           Data.Map                 (Map)
-import qualified Data.Map                 as M
-import           Data.Semigroup           as Sem
-import           Kafka.Internal.Setup     (KafkaConf(..), Callback(..))
-import           Kafka.Types              (KafkaDebug(..), Timeout(..), KafkaCompressionCodec(..), KafkaLogLevel(..), BrokerAddress(..), kafkaDebugToText, kafkaCompressionCodecToText, Millis(..))
+import           Control.Monad        (MonadPlus (mplus))
+import           Data.Map             (Map)
+import qualified Data.Map             as M
+import           Data.Semigroup       as Sem (Semigroup ((<>)))
+import           Data.Text            (Text)
+import qualified Data.Text            as Text
+import           Kafka.Internal.Setup (Callback (..))
+import           Kafka.Types          (BrokerAddress (..), KafkaCompressionCodec (..), KafkaDebug (..), KafkaLogLevel (..), Millis (..), Timeout (..), kafkaCompressionCodecToText, kafkaDebugToText)
 
-import           Kafka.Producer.Callbacks
+import Kafka.Producer.Callbacks
 
 -- | Properties to create 'Kafka.Producer.Types.KafkaProducer'.
 data ProducerProperties = ProducerProperties

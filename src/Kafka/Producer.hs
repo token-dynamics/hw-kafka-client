@@ -1,27 +1,27 @@
-{-# LANGUAGE TupleSections              #-}
-{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE TupleSections #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module to produce messages to Kafka topics.
--- 
+--
 -- Here's an example of code to produce messages to a topic:
--- 
+--
 -- @
 -- import Control.Exception (bracket)
 -- import Control.Monad (forM_)
 -- import Data.ByteString (ByteString)
 -- import Kafka.Producer
--- 
+--
 -- -- Global producer properties
 -- producerProps :: 'ProducerProperties'
 -- producerProps = 'brokersList' ["localhost:9092"]
 --              <> 'logLevel' 'KafkaLogDebug'
--- 
+--
 -- -- Topic to send messages to
 -- targetTopic :: 'TopicName'
 -- targetTopic = 'TopicName' "kafka-client-example-topic"
--- 
+--
 -- -- Run an example
 -- runProducerExample :: IO ()
 -- runProducerExample =
@@ -32,18 +32,18 @@
 --       clProducer (Right prod) = 'closeProducer' prod
 --       runHandler (Left err)   = pure $ Left err
 --       runHandler (Right prod) = sendMessages prod
--- 
+--
 -- -- Example sending 2 messages and printing the response from Kafka
 -- sendMessages :: 'KafkaProducer' -> IO (Either 'KafkaError' ())
 -- sendMessages prod = do
 --   err1 <- 'produceMessage' prod (mkMessage Nothing (Just "test from producer") )
 --   forM_ err1 print
--- 
+--
 --   err2 <- 'produceMessage' prod (mkMessage (Just "key") (Just "test from producer (with key)"))
 --   forM_ err2 print
--- 
+--
 --   pure $ Right ()
--- 
+--
 -- mkMessage :: Maybe ByteString -> Maybe ByteString -> 'ProducerRecord'
 -- mkMessage k v = 'ProducerRecord'
 --                   { 'prTopic' = targetTopic
@@ -73,19 +73,18 @@ import           Control.Monad.IO.Class   (MonadIO (liftIO))
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Internal as BSI
 import           Data.Function            (on)
-import           Data.List                (groupBy, sortBy)
-import           Data.Ord                 (comparing)
+import           Data.List                (groupBy, sortOn)
 import qualified Data.Text                as Text
 import           Foreign.ForeignPtr       (newForeignPtr_, withForeignPtr)
 import           Foreign.Marshal.Array    (withArrayLen)
 import           Foreign.Ptr              (Ptr, nullPtr, plusPtr)
+import           Foreign.StablePtr        (castStablePtrToPtr, newStablePtr)
 import           Foreign.Storable         (Storable (..))
-import           Foreign.StablePtr        (newStablePtr, castStablePtrToPtr)
 import           Kafka.Internal.RdKafka   (RdKafkaMessageT (..), RdKafkaRespErrT (..), RdKafkaTypeT (..), destroyUnmanagedRdKafkaTopic, newRdKafkaT, newUnmanagedRdKafkaTopicT, rdKafkaOutqLen, rdKafkaProduce, rdKafkaProduceBatch, rdKafkaSetLogLevel)
-import           Kafka.Internal.Setup     (Kafka (..), KafkaConf (..), KafkaProps (..), TopicConf (..), TopicProps (..), kafkaConf, topicConf, Callback(..))
+import           Kafka.Internal.Setup     (Callback (..), Kafka (..), KafkaConf (..), KafkaProps (..), TopicConf (..), TopicProps (..), kafkaConf, topicConf)
 import           Kafka.Internal.Shared    (pollEvents)
 import           Kafka.Producer.Convert   (copyMsgFlags, handleProduceErr', producePartitionCInt, producePartitionInt)
-import           Kafka.Producer.Types     (KafkaProducer (..), ImmediateError(..))
+import           Kafka.Producer.Types     (ImmediateError (..), KafkaProducer (..))
 
 import Kafka.Producer.ProducerProperties as X
 import Kafka.Producer.Types              as X hiding (KafkaProducer)
@@ -113,11 +112,12 @@ runProducer props f =
 -- A newly created producer must be closed with 'closeProducer' function.
 newProducer :: MonadIO m => ProducerProperties -> m (Either KafkaError KafkaProducer)
 newProducer pps = liftIO $ do
-  kc@(KafkaConf kc' _ _) <- kafkaConf (KafkaProps $ (ppKafkaProps pps))
-  tc <- topicConf (TopicProps $ (ppTopicProps pps))
+  kc@(KafkaConf kc' _ _) <- kafkaConf (KafkaProps (ppKafkaProps pps))
+  tc <- topicConf (TopicProps (ppTopicProps pps))
 
   -- add default delivery report callback
-  deliveryCallback (const mempty) kc
+  let Callback setDeliveryCallback = deliveryCallback (const mempty)
+  setDeliveryCallback kc
 
   -- set callbacks
   forM_ (ppCallbacks pps) (\(Callback setCb) -> setCb kc)
@@ -198,7 +198,7 @@ produceMessageBatch kp@(KafkaProducer (Kafka k) _ (TopicConf tc)) messages = lif
   concat <$> forM (mkBatches messages) sendBatch
   where
     mkSortKey = prTopic &&& prPartition
-    mkBatches = groupBy ((==) `on` mkSortKey) . sortBy (comparing mkSortKey)
+    mkBatches = groupBy ((==) `on` mkSortKey) . sortOn mkSortKey
 
     mkTopic (TopicName tn) = newUnmanagedRdKafkaTopicT k (Text.unpack tn) (Just tc)
 
@@ -248,7 +248,7 @@ flushProducer :: MonadIO m => KafkaProducer -> m ()
 flushProducer kp = liftIO $ do
     pollEvents kp (Just $ Timeout 100)
     l <- outboundQueueLength (kpKafkaPtr kp)
-    if (l == 0)
+    if l == 0
       then pollEvents kp (Just $ Timeout 0) -- to be sure that all the delivery reports are fired
       else flushProducer kp
 
